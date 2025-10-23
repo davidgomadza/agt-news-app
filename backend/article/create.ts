@@ -1,6 +1,9 @@
 import { api } from "encore.dev/api";
 import db from "../db";
 import type { Article, CreateArticleRequest } from "./types";
+import { checkRateLimit } from "../middleware/rate-limit";
+import { logRequest, logError, logSuccess } from "../middleware/logger";
+import { validateRequired, validateLength, sanitizeString, validateUrl } from "../middleware/validator";
 
 function slugify(text: string): string {
   return text
@@ -15,7 +18,32 @@ function slugify(text: string): string {
 export const create = api<CreateArticleRequest, Article>(
   { expose: true, method: "POST", path: "/articles" },
   async (req) => {
-    const slug = slugify(req.title);
+    logRequest("POST", "/articles");
+    checkRateLimit("create-article");
+
+    try {
+      validateRequired(req.title, "title");
+      validateLength(req.title, "title", 3, 200);
+      validateRequired(req.excerpt, "excerpt");
+      validateLength(req.excerpt, "excerpt", 10, 500);
+      validateRequired(req.content, "content");
+      validateLength(req.content, "content", 50, 50000);
+      validateRequired(req.author, "author");
+      validateLength(req.author, "author", 2, 100);
+      
+      if (req.imageUrl && !validateUrl(req.imageUrl)) {
+        throw new Error("Invalid image URL");
+      }
+    } catch (error) {
+      logError("POST", "/articles", error as Error);
+      throw error;
+    }
+
+    const sanitizedTitle = sanitizeString(req.title, 200);
+    const sanitizedExcerpt = sanitizeString(req.excerpt, 500);
+    const sanitizedContent = sanitizeString(req.content, 50000);
+    const sanitizedAuthor = sanitizeString(req.author, 100);
+    const slug = slugify(sanitizedTitle);
     const isBreaking = req.isBreaking ?? false;
     const isFeatured = req.isFeatured ?? false;
 
@@ -35,7 +63,7 @@ export const create = api<CreateArticleRequest, Article>(
       updated_at: Date;
     }>`
       INSERT INTO articles (title, slug, excerpt, content, author, category_id, image_url, is_breaking, is_featured)
-      VALUES (${req.title}, ${slug}, ${req.excerpt}, ${req.content}, ${req.author}, ${req.categoryId}, ${req.imageUrl ?? null}, ${isBreaking}, ${isFeatured})
+      VALUES (${sanitizedTitle}, ${slug}, ${sanitizedExcerpt}, ${sanitizedContent}, ${sanitizedAuthor}, ${req.categoryId}, ${req.imageUrl ?? null}, ${isBreaking}, ${isFeatured})
       RETURNING *
     `;
 
@@ -59,6 +87,8 @@ export const create = api<CreateArticleRequest, Article>(
       category_name: categoryRow.name,
       category_slug: categoryRow.slug,
     };
+
+    logSuccess("POST", "/articles", 201);
 
     return {
       id: row.id,

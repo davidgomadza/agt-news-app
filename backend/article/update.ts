@@ -1,36 +1,62 @@
 import { api, APIError } from "encore.dev/api";
 import db from "../db";
 import type { Article, UpdateArticleRequest } from "./types";
+import { checkRateLimit } from "../middleware/rate-limit";
+import { logRequest, logError, logSuccess } from "../middleware/logger";
+import { validateLength, sanitizeString, validateUrl } from "../middleware/validator";
 
 // Updates an existing article.
 export const update = api<UpdateArticleRequest, Article>(
   { expose: true, method: "PATCH", path: "/articles/:id" },
   async (req) => {
+    logRequest("PATCH", `/articles/${req.id}`);
+    checkRateLimit(`update-article-${req.id}`);
+
+    try {
+      if (req.title !== undefined) {
+        validateLength(req.title, "title", 3, 200);
+      }
+      if (req.excerpt !== undefined) {
+        validateLength(req.excerpt, "excerpt", 10, 500);
+      }
+      if (req.content !== undefined) {
+        validateLength(req.content, "content", 50, 50000);
+      }
+      if (req.author !== undefined) {
+        validateLength(req.author, "author", 2, 100);
+      }
+      if (req.imageUrl && !validateUrl(req.imageUrl)) {
+        throw new Error("Invalid image URL");
+      }
+    } catch (error) {
+      logError("PATCH", `/articles/${req.id}`, error as Error);
+      throw error;
+    }
     const updates: string[] = [];
     const params: any[] = [];
     let paramIndex = 1;
 
     if (req.title !== undefined) {
       updates.push(`title = $${paramIndex}`);
-      params.push(req.title);
+      params.push(sanitizeString(req.title, 200));
       paramIndex++;
     }
 
     if (req.excerpt !== undefined) {
       updates.push(`excerpt = $${paramIndex}`);
-      params.push(req.excerpt);
+      params.push(sanitizeString(req.excerpt, 500));
       paramIndex++;
     }
 
     if (req.content !== undefined) {
       updates.push(`content = $${paramIndex}`);
-      params.push(req.content);
+      params.push(sanitizeString(req.content, 50000));
       paramIndex++;
     }
 
     if (req.author !== undefined) {
       updates.push(`author = $${paramIndex}`);
-      params.push(req.author);
+      params.push(sanitizeString(req.author, 100));
       paramIndex++;
     }
 
@@ -115,6 +141,8 @@ export const update = api<UpdateArticleRequest, Article>(
     if (!categoryRow) {
       throw new Error("Category not found");
     }
+
+    logSuccess("PATCH", `/articles/${req.id}`);
 
     return {
       id: row.id,

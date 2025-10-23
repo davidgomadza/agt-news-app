@@ -5,6 +5,7 @@ import backend from "~backend/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { sanitizeUrl } from "@/lib/sanitize";
 
 export default function ArticlePage() {
   const { slug } = useParams<{ slug: string }>();
@@ -89,7 +90,7 @@ export default function ArticlePage() {
         {article.imageUrl && (
           <div className="aspect-video overflow-hidden rounded-lg">
             <img
-              src={article.imageUrl}
+              src={sanitizeUrl(article.imageUrl)}
               alt={article.title}
               className="w-full h-full object-cover"
             />

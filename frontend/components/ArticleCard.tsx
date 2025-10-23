@@ -3,6 +3,7 @@ import { Calendar, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import type { Article } from "~backend/article/types";
+import { sanitizeUrl } from "@/lib/sanitize";
 
 interface ArticleCardProps {
   article: Article;
@@ -23,7 +24,7 @@ export default function ArticleCard({ article, featured = false }: ArticleCardPr
           {article.imageUrl && (
             <div className="aspect-video overflow-hidden">
               <img
-                src={article.imageUrl}
+                src={sanitizeUrl(article.imageUrl)}
                 alt={article.title}
                 className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
               />
@@ -70,7 +71,7 @@ export default function ArticleCard({ article, featured = false }: ArticleCardPr
         {article.imageUrl && (
           <div className="aspect-video overflow-hidden">
             <img
-              src={article.imageUrl}
+              src={sanitizeUrl(article.imageUrl)}
               alt={article.title}
               className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
             />
